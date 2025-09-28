@@ -32,6 +32,8 @@
 - Added a synthetic SAT practice scores CSV powering analytics views.
 - Built a dashboard page with Chart.js visualizations (rolling averages and distributions) plus a section filter.
 - Documented dataset usage within the data index.
+- Hardened the dashboard script to handle missing data and fetch failures gracefully for
+  better accessibility.
 
 ## Phase 6 - Nightly Refresh Pipeline
 - Added a configurable refresh script that syncs the practice scores CSV when an environment URL is provided.

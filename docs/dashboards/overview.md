@@ -86,11 +86,26 @@ Track practice trends across SAT sections using the lightweight charts below. Se
   let records = [];
 
   async function loadData() {
-    const response = await fetch("../data/sat_practice_scores.csv");
-    const text = await response.text();
-    records = parseCsv(text);
-    populateFilter();
-    updateCharts(sectionFilter.value);
+    try {
+      const response = await fetch("../data/sat_practice_scores.csv");
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+      const text = await response.text();
+      records = parseCsv(text);
+      populateFilter();
+      if (!sectionFilter.value) {
+        summary.textContent = "No sections available in the dataset.";
+        sectionFilter.disabled = true;
+        return;
+      }
+      sectionFilter.disabled = false;
+      updateCharts(sectionFilter.value);
+    } catch (error) {
+      console.error(error);
+      summary.textContent = "Unable to load dashboard data right now.";
+      sectionFilter.disabled = true;
+    }
   }
 
   function parseCsv(text) {
@@ -113,6 +128,9 @@ Track practice trends across SAT sections using the lightweight charts below. Se
     sectionFilter.innerHTML = sections
       .map((section) => `<option value="${section}">${section}</option>`)
       .join("");
+    if (!sections.length) {
+      sectionFilter.innerHTML = "";
+    }
   }
 
   function computeRollingAverage(section, windowSize = 3) {
@@ -161,6 +179,9 @@ Track practice trends across SAT sections using the lightweight charts below. Se
     if (rollingChart) {
       rollingChart.destroy();
     }
+    if (!labels.length) {
+      return false;
+    }
     rollingChart = new Chart(rollingCanvas, {
       type: "line",
       data: {
@@ -187,12 +208,16 @@ Track practice trends across SAT sections using the lightweight charts below. Se
         },
       },
     });
+    return true;
   }
 
   function renderDistribution(section) {
     const distribution = buildDistribution(section);
     if (distributionChart) {
       distributionChart.destroy();
+    }
+    if (!distribution.labels.length) {
+      return false;
     }
     distributionChart = new Chart(distributionCanvas, {
       type: "bar",
@@ -224,12 +249,21 @@ Track practice trends across SAT sections using the lightweight charts below. Se
         },
       },
     });
+    return true;
   }
 
-  function updateSummary(section) {
+  function updateSummary(section, { hasRolling, hasDistribution }) {
     const filtered = records.filter((record) => record.section === section);
     if (!filtered.length) {
       summary.textContent = `No data available for ${section}.`;
+      return;
+    }
+    if (!hasRolling) {
+      summary.textContent = `${section} does not have enough data for a rolling average.`;
+      return;
+    }
+    if (!hasDistribution) {
+      summary.textContent = `${section} does not have any recorded scores yet.`;
       return;
     }
     const average =
@@ -240,9 +274,9 @@ Track practice trends across SAT sections using the lightweight charts below. Se
   }
 
   function updateCharts(section) {
-    renderRolling(section);
-    renderDistribution(section);
-    updateSummary(section);
+    const hasRolling = renderRolling(section);
+    const hasDistribution = renderDistribution(section);
+    updateSummary(section, { hasRolling, hasDistribution });
   }
 
   sectionFilter.addEventListener("change", (event) => {
