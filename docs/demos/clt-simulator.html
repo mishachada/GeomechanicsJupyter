@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Central Limit Theorem Simulator</title>
+    <style>
+      :root {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #1f2933;
+        background-color: #f9fafb;
+        line-height: 1.6;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      form {
+        background: #ffffff;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        display: grid;
+        gap: 1rem;
+      }
+      .field {
+        display: grid;
+        gap: 0.35rem;
+      }
+      label {
+        font-weight: 600;
+      }
+      input,
+      select {
+        font: inherit;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        border: 1px solid #cbd5f5;
+      }
+      input:focus-visible,
+      select:focus-visible,
+      button:focus-visible {
+        outline: 3px solid #f59e0b;
+        outline-offset: 2px;
+      }
+      button {
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        justify-self: start;
+      }
+      .layout {
+        display: grid;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      }
+      canvas {
+        max-width: 100%;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-top: 1rem;
+        align-items: center;
+      }
+      .status {
+        color: #0b7285;
+        font-size: 0.95rem;
+      }
+      @media (min-width: 768px) {
+        .layout {
+          grid-template-columns: 2fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Central Limit Theorem Simulator</h1>
+        <p>
+          Sample repeatedly from different distributions to observe how the distribution of sample means approaches normality.
+        </p>
+      </header>
+      <form id="controls" aria-label="Simulation controls">
+        <div class="field">
+          <label for="distribution">Distribution</label>
+          <select id="distribution">
+            <option value="uniform">Uniform (0, 1)</option>
+            <option value="bernoulli">Bernoulli (p)</option>
+            <option value="exponential">Exponential (λ)</option>
+          </select>
+        </div>
+        <div class="field" id="param-field">
+          <label for="parameter" id="parameter-label">Probability p</label>
+          <input id="parameter" type="number" min="0" max="1" step="0.05" value="0.5" />
+        </div>
+        <div class="field">
+          <label for="sample-size">Sample size (n)</label>
+          <input id="sample-size" type="number" min="1" max="200" value="30" />
+        </div>
+        <div class="field">
+          <label for="trials">Trials</label>
+          <input id="trials" type="number" min="10" max="2000" step="10" value="200" />
+        </div>
+        <button type="submit">Run simulation</button>
+      </form>
+      <div class="layout">
+        <section class="card" aria-live="polite" aria-atomic="true">
+          <h2>Histogram of Sample Means</h2>
+          <canvas id="histogram" height="320" role="img" aria-label="Histogram displaying the distribution of sample means."></canvas>
+        </section>
+        <section class="card" aria-live="polite" aria-atomic="true">
+          <h2>Summary</h2>
+          <p><strong>Mean of means:</strong> <span id="mean-output">—</span></p>
+          <p><strong>Standard deviation:</strong> <span id="std-output">—</span></p>
+          <p id="clt-narrative">Adjust the controls to generate a new simulation.</p>
+        </section>
+      </div>
+      <section class="actions">
+        <button type="button" id="copy-problem">Copy problem to clipboard</button>
+        <span class="status" aria-live="polite" aria-atomic="true" id="copy-status"></span>
+      </section>
+    </main>
+    <script type="module">
+      import { Chart, registerables } from "https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.esm.js";
+
+      Chart.register(...registerables);
+
+      const controls = document.getElementById("controls");
+      const distributionSelect = document.getElementById("distribution");
+      const parameterField = document.getElementById("param-field");
+      const parameterInput = document.getElementById("parameter");
+      const parameterLabel = document.getElementById("parameter-label");
+      const sampleSizeInput = document.getElementById("sample-size");
+      const trialsInput = document.getElementById("trials");
+      const meanOutput = document.getElementById("mean-output");
+      const stdOutput = document.getElementById("std-output");
+      const narrative = document.getElementById("clt-narrative");
+      const copyButton = document.getElementById("copy-problem");
+      const copyStatus = document.getElementById("copy-status");
+      const histogramCanvas = document.getElementById("histogram");
+      let chart;
+
+      function toggleParameter() {
+        const type = distributionSelect.value;
+        if (type === "uniform") {
+          parameterField.style.display = "none";
+        } else {
+          parameterField.style.display = "grid";
+          if (type === "bernoulli") {
+            parameterLabel.textContent = "Probability p";
+            parameterInput.min = "0";
+            parameterInput.max = "1";
+            parameterInput.step = "0.05";
+            parameterInput.value = "0.5";
+          } else {
+            parameterLabel.textContent = "Rate λ";
+            parameterInput.min = "0.2";
+            parameterInput.max = "5";
+            parameterInput.step = "0.1";
+            parameterInput.value = "1";
+          }
+        }
+      }
+
+      function randomUniform() {
+        return Math.random();
+      }
+
+      function randomBernoulli(p) {
+        return Math.random() < p ? 1 : 0;
+      }
+
+      function randomExponential(lambda) {
+        return -Math.log(1 - Math.random()) / lambda;
+      }
+
+      function sampleMean(distribution, param, size) {
+        let sum = 0;
+        for (let i = 0; i < size; i += 1) {
+          if (distribution === "uniform") {
+            sum += randomUniform();
+          } else if (distribution === "bernoulli") {
+            sum += randomBernoulli(param);
+          } else {
+            sum += randomExponential(param);
+          }
+        }
+        return sum / size;
+      }
+
+      function computeStats(values) {
+        const mean = values.reduce((acc, value) => acc + value, 0) / values.length;
+        const variance =
+          values.reduce((acc, value) => acc + (value - mean) ** 2, 0) / (values.length || 1);
+        return { mean, std: Math.sqrt(variance) };
+      }
+
+      function buildHistogram(values, bins = 12) {
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const width = (max - min) || 1;
+        const step = width / bins;
+        const counts = new Array(bins).fill(0);
+        values.forEach((value) => {
+          const index = Math.min(bins - 1, Math.floor((value - min) / step));
+          counts[index] += 1;
+        });
+        const labels = counts.map((_, index) => {
+          const start = min + index * step;
+          const end = start + step;
+          return `${start.toFixed(2)} – ${end.toFixed(2)}`;
+        });
+        return { labels, counts };
+      }
+
+      function renderChart(labels, counts) {
+        if (chart) {
+          chart.destroy();
+        }
+        chart = new Chart(histogramCanvas, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Frequency",
+                data: counts,
+                backgroundColor: "rgba(37, 99, 235, 0.6)",
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: {
+                  maxRotation: 0,
+                },
+              },
+              y: {
+                beginAtZero: true,
+              },
+            },
+            plugins: {
+              legend: {
+                display: false,
+              },
+            },
+          },
+        });
+      }
+
+      function formatNarrative(distribution, stats) {
+        const descriptions = {
+          uniform: "Uniform distributions already look balanced, so their sample means center quickly around 0.5.",
+          bernoulli: "Bernoulli trials create a discrete distribution, yet the sample means still cluster near p.",
+          exponential: "Exponential samples are skewed, but averaging smooths them toward a bell curve.",
+        };
+        return `${descriptions[distribution]} The simulated means have mean ${stats.mean.toFixed(
+          3
+        )} and standard deviation ${stats.std.toFixed(3)}.`;
+      }
+
+      function runSimulation(event) {
+        event.preventDefault();
+        const distribution = distributionSelect.value;
+        const size = Number.parseInt(sampleSizeInput.value, 10);
+        const trials = Number.parseInt(trialsInput.value, 10);
+        const paramValue = Number.parseFloat(parameterInput.value);
+        const values = [];
+        for (let i = 0; i < trials; i += 1) {
+          const mean = sampleMean(distribution, paramValue, size);
+          values.push(mean);
+        }
+        const stats = computeStats(values);
+        const histogram = buildHistogram(values);
+        meanOutput.textContent = stats.mean.toFixed(4);
+        stdOutput.textContent = stats.std.toFixed(4);
+        narrative.textContent = formatNarrative(distribution, stats);
+        renderChart(histogram.labels, histogram.counts);
+      }
+
+      async function copyProblem() {
+        const distribution = distributionSelect.options[distributionSelect.selectedIndex].text;
+        const size = sampleSizeInput.value;
+        const trials = trialsInput.value;
+        const param = parameterField.style.display === "none" ? "" : ` with parameter ${parameterInput.value}`;
+        const prompt = `Simulate ${trials} trials of ${size}-sample means from a ${distribution}${param}. Describe how the central limit theorem applies.`;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          copyStatus.textContent = "Problem copied to clipboard.";
+        } catch (error) {
+          copyStatus.textContent = "Clipboard copy unavailable in this browser.";
+        }
+      }
+
+      controls.addEventListener("submit", runSimulation);
+      distributionSelect.addEventListener("change", () => {
+        toggleParameter();
+      });
+      copyButton.addEventListener("click", copyProblem);
+
+      toggleParameter();
+      runSimulation(new Event("submit"));
+    </script>
+  </body>
+</html>

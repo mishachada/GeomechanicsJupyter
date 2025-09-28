@@ -1,0 +1,38 @@
+name: Refresh practice data
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Refresh dataset
+        env:
+          SAT_DATA_SOURCE_URL: ${{ secrets.SAT_DATA_SOURCE_URL }}
+        run: |
+          python scripts/refresh_data.py
+
+      - name: Commit updated dataset
+        run: |
+          if git diff --quiet docs/data/sat_practice_scores.csv; then
+            echo "No dataset changes to commit."
+          else
+            git config user.email "actions@github.com"
+            git config user.name "github-actions"
+            git commit -am "chore: refresh practice data"
+            git push
+          fi
