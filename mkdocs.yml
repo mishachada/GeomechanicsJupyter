@@ -1,0 +1,43 @@
+site_name: Teaching Hub
+site_url: https://example.github.io/teaching-hub
+repo_url: https://github.com/example/teaching-hub
+site_description: SAT Math and AP Physics learning hub with interactive resources.
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - toc.integrate
+plugins:
+  - search
+  - mkdocs-jupyter
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js
+  - https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js
+  - js/katex-init.js
+extra_css:
+  - https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css
+nav:
+  - Home: index.md
+  - About: about.md
+  - SAT:
+      - Guides:
+          - Reading Strategies: sat/guides/reading-strategies.md
+      - Problem Bank: sat/problem-bank/README.md
+  - AP Physics 1:
+      - Units:
+          - Kinematics: ap-physics-1/units/kinematics.md
+      - Labs: ap-physics-1/labs/index.md
+  - Demos:
+      - Overview: demos/index.md
+      - Discriminant Explorer: demos/discriminant-explorer.html
+      - CLT Simulator: demos/clt-simulator.html
+      - Projectile Motion: demos/projectile-motion.html
+  - Notebooks: notebooks/index.md
+  - Dashboards: dashboards/overview.md
+  - Data: data/index.md

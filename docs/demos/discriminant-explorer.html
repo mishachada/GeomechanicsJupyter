@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Discriminant Explorer</title>
+    <style>
+      :root {
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #1f2933;
+        background-color: #f9fafb;
+        line-height: 1.6;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      .controls {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        margin-bottom: 1.5rem;
+      }
+      .control {
+        background: #ffffff;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      }
+      label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .result-panel {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        align-items: start;
+      }
+      .result {
+        background: #ffffff;
+        border-radius: 0.75rem;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+      }
+      .result strong {
+        display: block;
+        font-size: 2rem;
+        margin-bottom: 0.25rem;
+      }
+      svg {
+        width: 100%;
+        height: auto;
+        max-height: 320px;
+        background: #ffffff;
+        border-radius: 0.75rem;
+        box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+      }
+      button {
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #f59e0b;
+        outline-offset: 2px;
+      }
+      .actions {
+        margin-top: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+      }
+      .status {
+        font-size: 0.95rem;
+        color: #0b7285;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Discriminant Explorer</h1>
+        <p>
+          Adjust the coefficients of the quadratic function \(y = ax^2 + bx + c\) to see how the discriminant changes and how many real
+          roots the parabola has.
+        </p>
+      </header>
+      <section class="controls" aria-label="Quadratic coefficient controls">
+        <div class="control">
+          <label for="coef-a">Coefficient a <span data-output-for="coef-a">1</span></label>
+          <input id="coef-a" type="range" min="-10" max="10" step="0.5" value="1" />
+        </div>
+        <div class="control">
+          <label for="coef-b">Coefficient b <span data-output-for="coef-b">-3</span></label>
+          <input id="coef-b" type="range" min="-10" max="10" step="0.5" value="-3" />
+        </div>
+        <div class="control">
+          <label for="coef-c">Coefficient c <span data-output-for="coef-c">2</span></label>
+          <input id="coef-c" type="range" min="-10" max="10" step="0.5" value="2" />
+        </div>
+      </section>
+      <section class="result-panel">
+        <article class="result" aria-live="polite" aria-atomic="true">
+          <strong id="discriminant-value">1.00</strong>
+          <p>
+            Discriminant \(\Delta = b^2 - 4ac\)
+          </p>
+          <p id="root-description">The quadratic has two distinct real roots.</p>
+        </article>
+        <figure class="result">
+          <figcaption>Graph of the quadratic function</figcaption>
+          <svg id="parabola-plot" viewBox="0 0 320 240" role="img" aria-labelledby="plot-title plot-desc">
+            <title id="plot-title">Quadratic graph</title>
+            <desc id="plot-desc">SVG rendering of y = ax^2 + bx + c for the selected coefficients.</desc>
+            <rect x="0" y="0" width="320" height="240" fill="#ffffff"></rect>
+            <path id="parabola-path" d="" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round"></path>
+            <line id="axis-x" x1="0" y1="120" x2="320" y2="120" stroke="#cbd5f5" stroke-width="1"></line>
+            <line id="axis-y" x1="160" y1="0" x2="160" y2="240" stroke="#cbd5f5" stroke-width="1"></line>
+          </svg>
+        </figure>
+      </section>
+      <section class="actions">
+        <button type="button" id="copy-problem">Copy problem to clipboard</button>
+        <span class="status" aria-live="polite" aria-atomic="true" id="copy-status"></span>
+      </section>
+    </main>
+    <script type="module">
+      const inputs = [
+        document.getElementById("coef-a"),
+        document.getElementById("coef-b"),
+        document.getElementById("coef-c"),
+      ];
+      const outputs = document.querySelectorAll("[data-output-for]");
+      const discriminantValue = document.getElementById("discriminant-value");
+      const rootDescription = document.getElementById("root-description");
+      const pathElement = document.getElementById("parabola-path");
+      const copyButton = document.getElementById("copy-problem");
+      const copyStatus = document.getElementById("copy-status");
+
+      function getCoefficients() {
+        return inputs.map((input) => Number.parseFloat(input.value));
+      }
+
+      function updateLabels() {
+        for (const output of outputs) {
+          const targetId = output.getAttribute("data-output-for");
+          const input = document.getElementById(targetId);
+          if (input) {
+            output.textContent = Number.parseFloat(input.value).toFixed(1);
+          }
+        }
+      }
+
+      function describeRoots(delta, a) {
+        if (Math.abs(a) < 1e-6) {
+          return "This is effectively a linear function; use slope-intercept form to find its root.";
+        }
+        if (delta > 0) {
+          return "The quadratic has two distinct real roots.";
+        }
+        if (delta === 0) {
+          return "The quadratic has one real root with multiplicity two.";
+        }
+        return "The quadratic has no real roots (complex conjugate pair).";
+      }
+
+      function updatePlot(a, b, c) {
+        const width = 320;
+        const height = 240;
+        const xMin = -6;
+        const xMax = 6;
+        const samples = 120;
+        const points = [];
+        let yMin = Number.POSITIVE_INFINITY;
+        let yMax = Number.NEGATIVE_INFINITY;
+        for (let i = 0; i <= samples; i += 1) {
+          const x = xMin + ((xMax - xMin) * i) / samples;
+          const y = a * x * x + b * x + c;
+          points.push({ x, y });
+          yMin = Math.min(yMin, y);
+          yMax = Math.max(yMax, y);
+        }
+        const padding = 1;
+        if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || Math.abs(yMax - yMin) < 1e-6) {
+          yMin = -10;
+          yMax = 10;
+        } else {
+          yMin -= padding;
+          yMax += padding;
+        }
+        const scaleX = width / (xMax - xMin);
+        const scaleY = height / (yMax - yMin);
+        const path = points
+          .map((point, index) => {
+            const px = (point.x - xMin) * scaleX;
+            const py = height - (point.y - yMin) * scaleY;
+            return `${index === 0 ? "M" : "L"}${px.toFixed(2)},${py.toFixed(2)}`;
+          })
+          .join(" ");
+        pathElement.setAttribute("d", path);
+      }
+
+      function update() {
+        const [a, b, c] = getCoefficients();
+        updateLabels();
+        const delta = Number.parseFloat((b * b - 4 * a * c).toFixed(2));
+        discriminantValue.textContent = delta.toFixed(2);
+        rootDescription.textContent = describeRoots(delta, a);
+        updatePlot(a, b, c);
+      }
+
+      async function copyProblem() {
+        const [a, b, c] = getCoefficients();
+        const prompt = `Analyze the discriminant for y = ${a.toFixed(1)}x^2 + ${b.toFixed(1)}x + ${c.toFixed(1)}. Determine the number of real roots.`;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          copyStatus.textContent = "Problem copied to clipboard.";
+        } catch (error) {
+          copyStatus.textContent = "Clipboard copy unavailable in this browser.";
+        }
+      }
+
+      inputs.forEach((input) => {
+        input.addEventListener("input", update);
+      });
+      copyButton.addEventListener("click", copyProblem);
+
+      update();
+    </script>
+  </body>
+</html>
